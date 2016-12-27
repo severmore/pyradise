@@ -1,1 +1,1 @@
-# pyradise
+# Pyradise: Python Radio Simulator
