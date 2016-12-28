@@ -53,5 +53,16 @@ class RadiationPatternsTest(unittest.TestCase):
         self.assertEqual(ch.patch_rp(azimuth=0, tilt=np.pi/2, wavelen=wavelen, width=width, length=length), 1)
         # self.assertEqual(ch.patch_rp(np.pi/2, np.pi/2, wavelen, width, length), 0)
 
+
+class ReflectionTest(unittest.TestCase):
+
+    def test_reflection(self):
+        self.assertEqual(ch.reflection(grazing_angle=0, polarization=0, permittivity=15,
+                                       conductivity=0.03, wavelen=0.34), -1 + 0j)
+        self.assertEqual(ch.reflection(grazing_angle=0, polarization=1, permittivity=15,
+                                       conductivity=0.03, wavelen=0.34), -1 + 0j)
+        self.assertEqual(ch.reflection(grazing_angle=0, polarization=0.5, permittivity=15,
+                                       conductivity=0.03, wavelen=0.34), -1 + 0j)
+
 if __name__ == '__main__':
     unittest.main()
