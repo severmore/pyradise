@@ -1,5 +1,12 @@
 import numpy as np
 import scipy.special as special
+import collections
+
+
+def vectorize(fn):
+    def wrapper(**args):
+        return fn(**args)
+    return np.vectorize(wrapper)
 
 
 def dbm2w(value_dbm):
@@ -28,6 +35,7 @@ def isotropic_rp(**kwargs):
 
 
 # noinspection PyUnusedLocal
+@vectorize
 def dipole_rp(*, azimuth, **kwargs):
     """
     Returns dipole directional gain
@@ -44,6 +52,7 @@ def dipole_rp(*, azimuth, **kwargs):
 
 # TODO: check right formula, guess type of antenna element if considering not dipole
 # noinspection PyUnusedLocal
+@vectorize
 def array_dipole_rp(*, azimuth, n, **kwargs):
     """
     Returns dipole array directional gain
@@ -63,7 +72,9 @@ def array_dipole_rp(*, azimuth, n, **kwargs):
 
 # TODO: check right formula
 # noinspection PyUnusedLocal
+@vectorize
 def helix_rp(*, azimuth, n, **kwargs):
+    # TODO: iterate over azimuth/n if isinstace(azimuth or n, collections.Iterable)
     """
     Returns helix antenna directional gain
     :param azimuth:
@@ -78,7 +89,9 @@ def helix_rp(*, azimuth, n, **kwargs):
         return 0.0
 
 
+@vectorize
 def _patch_rp_factor(azimuth, tilt, wavelen, width, length):
+    # TODO: iterate over azimuth/tilt if isinstace(azimuth or tilt, collections.Iterable)
     s_a = np.sin(azimuth)
     c_a = np.cos(azimuth)
     s_t = np.sin(tilt)
@@ -134,6 +147,7 @@ def reflection_constant(*, grazing_angle, polarization, permittivity, conductivi
 
 
 # noinspection PyUnusedLocal
+@vectorize
 def reflection(*, grazing_angle, polarization, permittivity, conductivity, wavelen, **kwargs):
     """
     Computes reflection coefficient from conducting surface with defined grazing angle and supported relative
