@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.special as special
 
 
 def dbm2w(value_dbm):
@@ -230,6 +231,7 @@ def two_ray_path_loss(*, distance, time, speed, ground_reflection, tx_rp, rx_rp,
                                   g1*r1/d1*np.exp(-1j*k*(d1 - speed*time*np.sin(alpha1))) )**2
 
 
+# noinspection PyUnusedLocal
 def signal2noise(*, rx_power, noise_power, **kwargs):
     """
     Computes Signal-to-Noise ratio. Input parameters are in logarithmic scale.
@@ -241,7 +243,54 @@ def signal2noise(*, rx_power, noise_power, **kwargs):
     return db2lin(rx_power - noise_power)
 
 
+# noinspection PyUnusedLocal
 def sync_angle(*, snr, preamble_duration=9.3e-6, bandwidth=1.2e6, **kwargs):
+    """
+    Computes the angle of de-synchronisation.
+    :param snr: an SNR of the received signal
+    :param preamble_duration: the duration of PHY-preamble in seconds
+    :param bandwidth: the bandwidth of the signal in herzs
+    :param kwargs:
+    :return: the angle of de-synchronisation
+    """
     return (snr*preamble_duration*bandwidth)**-0.5
 
 
+# noinspection PyUnusedLocal
+def snr_extended(*, snr, sync_phi=0, miller=1, symbol_duration=1.25e-6, bandwidth=1.2e6, **kwargs):
+    """
+    Computes the extended SNR for BER computation.
+    :param snr: an SNR of the received signal
+    :param sync_phi: the de-synchronization
+    :param miller: the order of Miller encoding
+    :param symbol_duration: the symbol duration in seconds
+    :param bandwidth: the bandwidth of the signal in herzs
+    :param kwargs:
+    :return: the extended SNR for BER computation
+    """
+    return miller * snr * symbol_duration * bandwidth * np.cos(sync_phi) ** 2
+
+
+# noinspection PyUnusedLocal
+def ber_over_awgn(*, snr, **kwargs):
+    """
+    Computes BER in an additive white gaussian noise (AWGN) channel for Binary Phase Shift Keying (BPSK)
+    :param snr: the extended SNR
+    :return:
+    """
+    def q_function(x):
+        return 0.5 - 0.5*special.erf(x/2**0.5)
+    t = q_function(snr**0.5)
+    return 2*t*(1 - t)
+
+
+# noinspection PyUnusedLocal
+def ber_over_rayleigh(*, snr, **kwargs):
+    """
+    Computes BER in the channel with Rayleigh fading for Binary Phase Shift Keying (BPSK)
+    :param snr:
+    :param kwargs:
+    :return:
+    """
+    t = (1 + 2/snr)**0.5
+    return 0.5 - 1/t + 2/np.pi * np.arctan(t)/t
