@@ -1,12 +1,11 @@
 import numpy as np
 import scipy.special as special
-import collections
 
 
-def vectorize(fn):
-    def wrapper(**args):
-        return fn(**args)
-    return np.vectorize(wrapper)
+# def vectorize(fn):
+#     def wrapper(**args):
+#         return fn(**args)
+#     return np.vectorize(wrapper)
 
 
 def dbm2w(value_dbm):
@@ -35,7 +34,7 @@ def isotropic_rp(**kwargs):
 
 
 # noinspection PyUnusedLocal
-@vectorize
+# @vectorize
 def dipole_rp(*, azimuth, **kwargs):
     """
     Returns dipole directional gain
@@ -44,7 +43,7 @@ def dipole_rp(*, azimuth, **kwargs):
     """
     c = np.cos(azimuth)
     s = np.sin(azimuth)
-    if np.abs(c) > 1e-9:
+    if c > 1e-9:
         return np.abs(np.cos(np.pi / 2 * s) / c)
     else:
         return 0.0
@@ -52,7 +51,7 @@ def dipole_rp(*, azimuth, **kwargs):
 
 # TODO: check right formula, guess type of antenna element if considering not dipole
 # noinspection PyUnusedLocal
-@vectorize
+# @vectorize
 def array_dipole_rp(*, azimuth, n, **kwargs):
     """
     Returns dipole array directional gain
@@ -62,19 +61,18 @@ def array_dipole_rp(*, azimuth, n, **kwargs):
     """
     c = np.cos(azimuth)
     s = np.sin(azimuth)
+    if c < 1e-9:
+        return 0.
     if np.abs(s) < 1e-9:
-        return 1.0
-    elif np.abs(c) > 1e-9:
+        return 1.
+    elif c > 1e-9:
         return np.abs(np.sin(np.pi / 2 * n * s) / np.sin(np.pi / 2 * s)) / n
-    else:
-        return 0.0
 
 
 # TODO: check right formula
 # noinspection PyUnusedLocal
-@vectorize
+# @vectorize
 def helix_rp(*, azimuth, n, **kwargs):
-    # TODO: iterate over azimuth/n if isinstace(azimuth or n, collections.Iterable)
     """
     Returns helix antenna directional gain
     :param azimuth:
@@ -83,38 +81,42 @@ def helix_rp(*, azimuth, n, **kwargs):
     """
     c = np.cos(azimuth)
     s = np.sin(azimuth)
-    if np.abs(c) > 1e-9:
+    if c > 1e-9:
         return np.abs(c * np.sin(np.pi / 2 * n * c) / np.sin(np.pi / 2 * c))
     else:
         return 0.0
 
 
-@vectorize
+# @vectorize
 def _patch_rp_factor(azimuth, tilt, wavelen, width, length):
-    # TODO: iterate over azimuth/tilt if isinstace(azimuth or tilt, collections.Iterable)
     s_a = np.sin(azimuth)
     c_a = np.cos(azimuth)
     s_t = np.sin(tilt)
     c_t = np.cos(tilt)
     kw = np.pi / wavelen * width
     kl = np.pi / wavelen * length
-    if np.abs(s_a) * np.abs(s_t) < 1e-9:
-        return 1.0
-    elif np.abs(c_a) + np.abs(c_t) > 1e-9:
-        return np.sin(kw * s_a * s_t) / (kw * s_a * s_t) * np.cos(kl * s_a * c_t)
+    if c_t < 1e-9 or c_a < 1e-9:
+        return 0
+    if np.abs(s_a) < 1e-9:
+        return 1.
+    elif np.abs(s_t) < 1e-9:
+        return np.cos(kl * s_a)
     else:
-        return 0.
+        return np.sin(kw * s_a * s_t) / (kw * s_a * s_t) * np.cos(kl * s_a * c_t)
 
 
+# @vectorize
 def _patch_theta_rp(azimuth, tilt, wavelen, width, length):
     return _patch_rp_factor(azimuth, tilt, wavelen, width, length) * np.cos(tilt)
 
 
+# @vectorize
 def _patch_phi_rp(azimuth, tilt, wavelen, width, length):
     return -1 * _patch_rp_factor(azimuth, tilt, wavelen, width, length) * np.sin(tilt) * np.cos(azimuth)
 
 
 # noinspection PyUnusedLocal
+# @vectorize
 def patch_rp(*, azimuth, tilt, wavelen, width, length, **kwargs):
     """
     Returns directional gain (in linear scale, 0..1)
@@ -125,7 +127,7 @@ def patch_rp(*, azimuth, tilt, wavelen, width, length, **kwargs):
     :param length:
     :return:
     """
-    return (np.abs(_patch_rp_factor(azimuth, tilt, wavelen, width, length)) *
+    return ( np.abs(_patch_rp_factor(azimuth, tilt, wavelen, width, length)) *
             (np.cos(tilt) ** 2 + np.cos(azimuth) ** 2 * np.sin(tilt) ** 2) ** 0.5)
 
 
@@ -147,7 +149,7 @@ def reflection_constant(*, grazing_angle, polarization, permittivity, conductivi
 
 
 # noinspection PyUnusedLocal
-@vectorize
+# @vectorize
 def reflection(*, grazing_angle, polarization, permittivity, conductivity, wavelen, **kwargs):
     """
     Computes reflection coefficient from conducting surface with defined grazing angle and supported relative
@@ -182,11 +184,14 @@ def reflection(*, grazing_angle, polarization, permittivity, conductivity, wavel
     return polarization * reflection_parallel + (1 - polarization) * reflection_perpendicular
 
 
-def free_space_path_loss_2d(*, distance, tx_rp, rx_rp, tx_height, rx_height, wavelen, **kwargs):
+# @vectorize
+def free_space_path_loss_2d(*, distance, tx_rp, rx_rp, tx_angle, rx_angle, tx_height, rx_height, wavelen, **kwargs):
     """
     Computes free space signal attenuation between the transmitter and the receiver in linear scale.
 
     :param distance: the distance between transmitter and receiver
+    :param rx_angle: a mount angle of transmitter antenna
+    :param tx_angle: a mount angle of receiver antenna
     :param tx_rp: a radiation pattern of the transmitter
     :param rx_rp: a radiation pattern of the receiver
     :param tx_height: a mount height of the transmitter
@@ -196,19 +201,19 @@ def free_space_path_loss_2d(*, distance, tx_rp, rx_rp, tx_height, rx_height, wav
     """
     # Ray geometry computation
     delta_height = np.abs(tx_height - rx_height)
-    d0 = (delta_height**2 + distance**2)**0.5
+    d0 = (delta_height ** 2 + distance ** 2) ** 0.5
     alpha0 = np.arctan(distance / delta_height)
 
     # Attenuation caused by radiation pattern
-    g0 = (tx_rp(azimuth=alpha0, tilt=0, wavelen=wavelen, **kwargs) *
-          rx_rp(azimuth=alpha0, tilt=0, wavelen=wavelen, **kwargs))
+    g0 = (tx_rp(azimuth=alpha0 - tx_angle, tilt=0.00001, wavelen=wavelen, **kwargs) *
+          rx_rp(azimuth=alpha0 - rx_angle, tilt=0.00001, wavelen=wavelen, **kwargs))
 
-    k = wavelen / (4*np.pi)
-    return (k*g0/d0)**2
+    k = wavelen / (4 * np.pi)
+    return (k * g0 / d0) ** 2
 
 
-def two_ray_path_loss(*, distance, time, speed, ground_reflection, tx_rp, rx_rp, tx_height, rx_height, wavelen,
-                      **kwargs):
+def two_ray_path_loss(*, distance, time, speed, ground_reflection, tx_rp, rx_rp, tx_angle, rx_angle, tx_height,
+                      rx_height, wavelen, **kwargs):
     """
     Computes free space signal attenuation between the transmitter and the receiver in linear scale.
     :param distance: the distance between transmitter and receiver
@@ -217,6 +222,8 @@ def two_ray_path_loss(*, distance, time, speed, ground_reflection, tx_rp, rx_rp,
     :param ground_reflection: a function to compute a complex-valued reflection coefficient
     :param tx_rp: a radiation pattern of the transmitter
     :param rx_rp: a radiation pattern of the receiver
+    :param rx_angle: a mount angle of transmitter antenna
+    :param tx_angle: a mount angle of receiver antenna
     :param tx_height: a mount height of the transmitter
     :param rx_height: a mount height of the receiver
     :param wavelen: a wavelen of signal carrier
@@ -231,18 +238,18 @@ def two_ray_path_loss(*, distance, time, speed, ground_reflection, tx_rp, rx_rp,
     alpha1 = np.arctan(distance / sigma_height)
 
     # Attenuation caused by radiation pattern
-    g0 = (tx_rp(azimuth=alpha0, tilt=0, wavelen=wavelen, **kwargs) *
-          rx_rp(azimuth=alpha0, tilt=0, wavelen=wavelen, **kwargs))
+    g0 = (tx_rp(azimuth=alpha0 - tx_angle, tilt=0, wavelen=wavelen, **kwargs) *
+          rx_rp(azimuth=alpha0 - rx_angle, tilt=0, wavelen=wavelen, **kwargs))
 
-    g1 = (tx_rp(azimuth=alpha1, tilt=0, wavelen=wavelen, **kwargs) *
-          rx_rp(azimuth=alpha1, tilt=0, wavelen=wavelen, **kwargs))
+    g1 = (tx_rp(azimuth=alpha1 - tx_angle, tilt=0, wavelen=wavelen, **kwargs) *
+          rx_rp(azimuth=alpha1 - rx_angle, tilt=0, wavelen=wavelen, **kwargs))
 
     # Attenuation due to reflections (reflection coefficient) computation
     r1 = ground_reflection(grazing_angle=alpha1, wavelen=wavelen, **kwargs)
 
-    k = 2*np.pi / wavelen
-    return (0.5/k)**2 * np.absolute( g0/d0*np.exp(-1j*k*(d0 + speed*time*np.sin(alpha0))) +
-                                  g1*r1/d1*np.exp(-1j*k*(d1 - speed*time*np.sin(alpha1))) )**2
+    k = 2 * np.pi / wavelen
+    return (0.5 / k) ** 2 * np.absolute(   g0/d0*np.exp(-1j*k*(d0 - speed*time*np.sin(np.pi/2 + alpha0))) +
+                                        g1*r1/d1*np.exp(-1j*k*(d1 - speed*time*np.sin(np.pi/2 + alpha1)))) ** 2
 
 
 # noinspection PyUnusedLocal
@@ -267,7 +274,7 @@ def sync_angle(*, snr, preamble_duration=9.3e-6, bandwidth=1.2e6, **kwargs):
     :param kwargs:
     :return: the angle of de-synchronisation
     """
-    return (snr*preamble_duration*bandwidth)**-0.5
+    return (snr * preamble_duration * bandwidth) ** -0.5
 
 
 # noinspection PyUnusedLocal
@@ -292,10 +299,12 @@ def ber_over_awgn(*, snr, **kwargs):
     :param snr: the extended SNR
     :return:
     """
+
     def q_function(x):
-        return 0.5 - 0.5*special.erf(x/2**0.5)
-    t = q_function(snr**0.5)
-    return 2*t*(1 - t)
+        return 0.5 - 0.5 * special.erf(x / 2 ** 0.5)
+
+    t = q_function(snr ** 0.5)
+    return 2 * t * (1 - t)
 
 
 # noinspection PyUnusedLocal
@@ -306,5 +315,5 @@ def ber_over_rayleigh(*, snr, **kwargs):
     :param kwargs:
     :return:
     """
-    t = (1 + 2/snr)**0.5
-    return 0.5 - 1/t + 2/np.pi * np.arctan(t)/t
+    t = (1 + 2 / snr) ** 0.5
+    return 0.5 - 1 / t + 2 / np.pi * np.arctan(t) / t
