@@ -205,8 +205,8 @@ def free_space_path_loss_2d(*, distance, tx_rp, rx_rp, tx_angle, rx_angle, tx_he
     alpha0 = np.arctan(distance / delta_height)
 
     # Attenuation caused by radiation pattern
-    g0 = (tx_rp(azimuth=alpha0 - tx_angle, tilt=0.00001, wavelen=wavelen, **kwargs) *
-          rx_rp(azimuth=alpha0 - rx_angle, tilt=0.00001, wavelen=wavelen, **kwargs))
+    g0 = (tx_rp(azimuth=alpha0 - tx_angle, tilt=0, wavelen=wavelen, **kwargs) *
+          rx_rp(azimuth=alpha0 - rx_angle, tilt=0, wavelen=wavelen, **kwargs))
 
     k = wavelen / (4 * np.pi)
     return (k * g0 / d0) ** 2
@@ -248,8 +248,34 @@ def two_ray_path_loss(*, distance, time, speed, ground_reflection, tx_rp, rx_rp,
     r1 = ground_reflection(grazing_angle=alpha1, wavelen=wavelen, **kwargs)
 
     k = 2 * np.pi / wavelen
-    return (0.5 / k) ** 2 * np.absolute(   g0/d0*np.exp(-1j*k*(d0 - speed*time*np.sin(np.pi/2 + alpha0))) +
-                                        g1*r1/d1*np.exp(-1j*k*(d1 - speed*time*np.sin(np.pi/2 + alpha1)))) ** 2
+    return (0.5 / k) ** 2 * np.absolute(   g0/d0*np.exp(-1j*k*(d0 + speed*time*np.sin(alpha0))) +
+                                        g1*r1/d1*np.exp(-1j*k*(d1 + speed*time*np.sin(alpha1)))) ** 2
+
+
+def two_ray_path_loss_2d(*, distance, start_position, ground_reflection, tx_rp, rx_rp, tx_angle, rx_angle, tx_height,
+                         rx_height, wavelen, **kwargs):
+    # Ray geometry computation
+    pass_distance = start_position - distance
+    delta_height = np.abs(tx_height - rx_height)
+    sigma_height = np.abs(tx_height + rx_height)
+    d0 = (delta_height ** 2 + distance ** 2) ** 0.5
+    d1 = (sigma_height ** 2 + distance ** 2) ** 0.5
+    alpha0 = np.arctan(distance / delta_height)
+    alpha1 = np.arctan(distance / sigma_height)
+
+    # Attenuation caused by radiation pattern
+    g0 = (tx_rp(azimuth=alpha0 - tx_angle, tilt=0, wavelen=wavelen, **kwargs) *
+          rx_rp(azimuth=alpha0 - rx_angle, tilt=0, wavelen=wavelen, **kwargs))
+
+    g1 = (tx_rp(azimuth=alpha1 - tx_angle, tilt=0, wavelen=wavelen, **kwargs) *
+          rx_rp(azimuth=alpha1 - rx_angle, tilt=0, wavelen=wavelen, **kwargs))
+
+    # Attenuation due to reflections (reflection coefficient) computation
+    r1 = ground_reflection(grazing_angle=alpha1, wavelen=wavelen, **kwargs)
+
+    k = 2 * np.pi / wavelen
+    return (0.5 / k) ** 2 * np.absolute(   g0/d0*np.exp(-1j*k*(d0 + pass_distance*distance/d0)) +
+                                        g1*r1/d1*np.exp(-1j*k*(d1 + pass_distance*distance/d1))) ** 2
 
 
 # noinspection PyUnusedLocal
