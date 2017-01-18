@@ -3,10 +3,10 @@ from numpy import linalg as la
 import scipy.special as special
 
 
-# def vectorize(fn):
-#     def wrapper(**args):
-#         return fn(**args)
-#     return np.vectorize(wrapper)
+def vectorize(fn):
+    def wrapper(*args, **kw):
+        return fn(*args, **kw)
+    return np.vectorize(wrapper)
 
 
 def dbm2w(value_dbm):
@@ -14,15 +14,16 @@ def dbm2w(value_dbm):
 
 
 def w2dbm(value_watt):
-    return 10 * np.log10(value_watt) + 30
+    return 10 * np.log10(value_watt) + 30 if value_watt >= 1e-15 else -np.inf
 
 
 def db2lin(value_db):
     return 10 ** (value_db / 10)
 
 
+@vectorize
 def lin2db(value_linear):
-    return 10 * np.log10(value_linear)
+    return 10 * np.log10(value_linear) if value_linear >= 1e-15 else -np.inf
 
 
 # noinspection PyUnusedLocal
@@ -207,8 +208,8 @@ def free_space_path_loss_2d(*, distance, tx_rp, rx_rp, tx_angle, rx_angle, tx_he
     alpha0 = np.arctan(distance / delta_height)
 
     # Attenuation caused by radiation pattern
-    g0 = (tx_rp(azimuth=alpha0 - tx_angle, tilt=0, wavelen=wavelen, **kwargs) *
-          rx_rp(azimuth=alpha0 - rx_angle, tilt=0, wavelen=wavelen, **kwargs))
+    g0 = (tx_rp(azimuth=alpha0 - tx_angle, tilt=np.pi/2, wavelen=wavelen, **kwargs) *
+          rx_rp(azimuth=alpha0 - rx_angle, tilt=np.pi/2, wavelen=wavelen, **kwargs))
 
     k = wavelen / (4 * np.pi)
     return (k * g0 / d0) ** 2
@@ -284,27 +285,29 @@ def two_ray_path_loss_3d(*, time, ground_reflection, wavelen,
     d1_vector = rx_pos_refl - tx_pos       # NLoS ray vector
     d0 = la.norm(d0_vector)                # LoS ray length
     d1 = la.norm(d1_vector)                # NLoS ray length
-    d0_vector_n = d0_vector / d0           # LoS ray vector normalized
-    d1_vector_n = d1_vector / d1           # NLoS ray vector normalized
+    d0_vector_tx_n = d0_vector / d0        # LoS ray vector normalized
+    d0_vector_rx_n = -d0_vector_tx_n
+    d1_vector_tx_n = d1_vector / d1        # NLoS ray vector normalized
+    d1_vector_rx_n = np.array([-d1_vector_tx_n[0], -d1_vector_tx_n[1], d1_vector_tx_n[2]])
 
     # Azimuth and tilt angle computation for computation of attenuation
     # caused by deflection from polar direction
-    tx_azimuth_0 = np.arccos(     np.dot(d0_vector_n, tx_dir_theta))
-    rx_azimuth_0 = np.arccos(-1 * np.dot(d0_vector_n, rx_dir_theta))
-    tx_azimuth_1 = np.arccos(     np.dot(d1_vector_n, tx_dir_theta))
-    rx_azimuth_1 = np.arccos(-1 * np.dot(d1_vector_n, rx_dir_theta))
+    tx_azimuth_0 = np.arccos(np.dot(d0_vector_tx_n, tx_dir_theta))
+    rx_azimuth_0 = np.arccos(np.dot(d0_vector_rx_n, rx_dir_theta))
+    tx_azimuth_1 = np.arccos(np.dot(d1_vector_tx_n, tx_dir_theta))
+    rx_azimuth_1 = np.arccos(np.dot(d1_vector_rx_n, rx_dir_theta))
 
-    tx_tilt_0 = np.arccos(     np.dot(d0_vector_n, tx_dir_phi))
-    rx_tilt_0 = np.arccos(-1 * np.dot(d0_vector_n, rx_dir_phi))
-    tx_tilt_1 = np.arccos(     np.dot(d1_vector_n, tx_dir_phi))
-    rx_tilt_1 = np.arccos(-1 * np.dot(d1_vector_n, rx_dir_phi))
+    tx_tilt_0 = np.arccos(np.dot(d0_vector_tx_n, tx_dir_phi))
+    rx_tilt_0 = np.arccos(np.dot(d0_vector_rx_n, rx_dir_phi))
+    tx_tilt_1 = np.arccos(np.dot(d1_vector_tx_n, tx_dir_phi))
+    rx_tilt_1 = np.arccos(np.dot(d1_vector_rx_n, rx_dir_phi))
 
     # A grazing angle of NLoS ray for computation of reflection coefficient
-    grazing_angle = np.arccos(-1*np.dot(d1_vector_n, ground_normal))
+    grazing_angle = np.arccos(-1*np.dot(d1_vector_rx_n, ground_normal))
 
     relative_velocity = rx_velocity - tx_velocity
-    velocity_pr_0 = np.dot(d0_vector_n, relative_velocity)
-    velocity_pr_1 = np.dot(d1_vector_n, relative_velocity)
+    velocity_pr_0 = np.dot(d0_vector_tx_n, relative_velocity)
+    velocity_pr_1 = np.dot(d1_vector_tx_n, relative_velocity)
 
     # Attenuation caused by radiation pattern
     g0 = (tx_rp(azimuth=tx_azimuth_0, tilt=tx_tilt_0, wavelen=wavelen, **kwargs) *
